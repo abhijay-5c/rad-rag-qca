@@ -1,1 +1,44 @@
 *.env
+pws.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Data files
+*.db
+*.sqlite3
+chroma_db/
+
+# Temporary files
+temp_*
+*.tmp
+
+# Reports and outputs
+report_*.json
+report_*.txt
+checklist_*.json
+
+# OS
+.DS_Store
+Thumbs.db
