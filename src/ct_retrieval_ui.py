@@ -15,7 +15,7 @@ load_dotenv('pws.env')
 class CTRetrievalUI:
     def __init__(self):
         """Initialize the retrieval UI"""
-        self.persist_directory = "./chroma_db"
+        self.persist_directory = "./data/chroma_db"
         self.client = chromadb.PersistentClient(path=self.persist_directory)
         self.collection = self.client.get_collection("ct_studies")
     

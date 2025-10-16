@@ -11,8 +11,14 @@ import glob
 load_dotenv('pws.env')
 
 class CTVectorDatabase:
-    def __init__(self, persist_directory="./data/chroma_db"):
+    def __init__(self, persist_directory=None):
         """Initialize the vector database with ChromaDB"""
+        # Auto-detect the correct path
+        if persist_directory is None:
+            if os.path.exists("./rad-rag-qca/data/chroma_db"):
+                persist_directory = "./rad-rag-qca/data/chroma_db"
+            else:
+                persist_directory = "./data/chroma_db"
         self.persist_directory = persist_directory
         self.client = chromadb.PersistentClient(path=persist_directory)
         self.collection = self.client.get_or_create_collection(

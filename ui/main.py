@@ -23,7 +23,7 @@ from config.prompts import (
 )
 
 # Load environment variables
-load_dotenv('pws.env')
+load_dotenv('/home/ai-user/rag-report-qcs-generation/pws.env')
 
 def generate_hierarchical_questions_from_checklist(checklist, study_type):
     """Generate hierarchical questions from checklist using LLM"""
@@ -476,7 +476,7 @@ elif page == "Interactive Checklist":
                             from langchain_openai import ChatOpenAI
                             from langchain.schema import HumanMessage, SystemMessage
                             
-                            llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.1, openai_api_key=os.getenv("OPENAI_API_KEY"))
+                            llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0.1, openai_api_key=os.getenv("OPENAI_API_KEY"))
                             
                             context_prompt = QUESTION_REFINEMENT_PROMPT_TEMPLATE.format(
                                 previous_findings=chr(10).join(previous_findings),

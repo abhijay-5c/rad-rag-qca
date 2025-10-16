@@ -81,28 +81,77 @@ class RadiologyReportGenerator:
         # Remove empty groups
         return {k: v for k, v in anatomy_groups.items() if v}
     
-    def generate_observations_section(self, findings: List[Dict[str, Any]], mod_study: str, case_metadata: Dict[str, Any]) -> str:
-        """Generate observations section from findings"""
+    def generate_observations_section(
+        self, 
+        findings: List[Dict[str, Any]], 
+        mod_study: str, 
+        case_metadata: Dict[str, Any],
+        all_answers: List[Dict[str, Any]] = None,
+        study_chunks: List[str] = None
+    ) -> str:
+        """Generate observations section from findings with full context
+        
+        Args:
+            findings: Positive findings (answer='Yes')
+            mod_study: Study type
+            case_metadata: Case information
+            all_answers: ALL answers including negative findings (NEW)
+            study_chunks: Study protocol chunks (NEW)
+        """
         
         # Group positive findings by subcategory
         findings_by_region = {}
         for finding in findings:
-            if finding.get('details') and finding.get('details').strip():
-                region = finding.get('subcategory', 'Other')
-                if region not in findings_by_region:
-                    findings_by_region[region] = []
-                findings_by_region[region].append({
-                    'question': finding.get('question', ''),
-                    'details': finding['details']
-                })
+            # Include ALL findings where answer is 'Yes', even if details are empty
+            region = finding.get('subcategory', 'Other')
+            if region not in findings_by_region:
+                findings_by_region[region] = []
+            
+            # If details are provided, use them; otherwise just use the question
+            details_text = finding.get('details', '').strip()
+            if not details_text:
+                # No details provided - just note that the finding is present
+                details_text = "Present (no additional details provided)"
+            
+            findings_by_region[region].append({
+                'question': finding.get('question', ''),
+                'details': details_text
+            })
+        
+        # Group negative findings by subcategory (NEW)
+        negative_findings_by_region = {}
+        if all_answers:
+            for answer in all_answers:
+                if answer.get('answer') == 'No':
+                    region = answer.get('subcategory', 'Other')
+                    if region not in negative_findings_by_region:
+                        negative_findings_by_region[region] = []
+                    negative_findings_by_region[region].append({
+                        'question': answer.get('question', '')
+                    })
+        
+        # Prepare study protocol context (NEW)
+        study_protocol_context = ""
+        if study_chunks:
+            # Combine chunks into concise protocol summary
+            study_protocol_context = "\n\n".join(study_chunks[:3])  # Use first 3 chunks for context
         
         system_prompt = OBSERVATIONS_SYSTEM_PROMPT
         
+        # Enhanced human prompt with all context
         human_prompt = OBSERVATIONS_HUMAN_PROMPT_TEMPLATE.format(
             mod_study=mod_study,
             clinical_history=case_metadata.get('clinical_history', 'Not specified'),
             findings_json=json.dumps(findings_by_region, indent=2)
         )
+        
+        # Add negative findings context
+        if negative_findings_by_region:
+            human_prompt += f"\n\n**NEGATIVE FINDINGS (Specifically Evaluated and Found Normal):**\n{json.dumps(negative_findings_by_region, indent=2)}"
+        
+        # Add study protocol context
+        if study_protocol_context:
+            human_prompt += f"\n\n**STUDY PROTOCOL REFERENCE (for systematic review):**\n{study_protocol_context}"
         
         messages = [
             SystemMessage(content=system_prompt),
@@ -119,18 +168,22 @@ class RadiologyReportGenerator:
     def generate_impression_section(self, findings: List[Dict[str, Any]], case_metadata: Dict[str, Any]) -> str:
         """Generate impression section from findings and case metadata"""
         
-        # Get only findings with details
-        positive_findings = [f for f in findings if f.get('details') and f.get('details').strip()]
+        # Get all findings where answer is 'Yes' (regardless of details)
+        positive_findings = [f for f in findings if f.get('answer') == 'Yes']
         
         if not positive_findings:
             return "No significant abnormalities identified on the current study."
         
         system_prompt = IMPRESSION_SYSTEM_PROMPT
         
-        # Extract just the details for impression
+        # Extract findings for impression
         findings_text = []
         for f in positive_findings:
-            findings_text.append(f"{f.get('question', '')}: {f['details']}")
+            details = f.get('details', '').strip()
+            if details:
+                findings_text.append(f"{f.get('question', '')}: {details}")
+            else:
+                findings_text.append(f"{f.get('question', '')}: Present")
         
         mod_study = case_metadata.get('mod_study', 'Unknown')
         
@@ -154,14 +207,37 @@ class RadiologyReportGenerator:
             print(f"Error generating impression: {str(e)}")
             return "Error generating impression section."
     
-    def generate_complete_report(self, case_metadata: Dict[str, Any], findings: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Generate a complete radiology report"""
+    def generate_complete_report(
+        self, 
+        case_metadata: Dict[str, Any], 
+        findings: List[Dict[str, Any]],
+        all_answers: List[Dict[str, Any]] = None,
+        study_chunks: List[str] = None
+    ) -> Dict[str, Any]:
+        """Generate a complete radiology report with full context
+        
+        Args:
+            case_metadata: Patient and case information
+            findings: Positive findings (answer='Yes')
+            all_answers: ALL answers including negative findings (NEW)
+            study_chunks: Study protocol chunks from vector DB (NEW)
+        """
         mod_study = case_metadata.get('mod_study', '')
         
-        # Generate each section
+        # Use all_answers if provided, otherwise fall back to findings
+        if all_answers is None:
+            all_answers = findings
+        
+        # Generate each section with enhanced context
         history = case_metadata.get('clinical_history', 'Not specified')
         technique = self.generate_technique_section(mod_study)
-        observations = self.generate_observations_section(findings, mod_study, case_metadata)
+        observations = self.generate_observations_section(
+            findings=findings,
+            mod_study=mod_study,
+            case_metadata=case_metadata,
+            all_answers=all_answers,      # NEW: Pass all answers
+            study_chunks=study_chunks      # NEW: Pass study chunks
+        )
         impression = self.generate_impression_section(findings, case_metadata)
         
         # Create the complete report

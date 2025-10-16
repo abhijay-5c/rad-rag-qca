@@ -20,7 +20,9 @@ def setup_database():
     try:
         # Initialize and process
         vector_db = CTVectorDatabase()
-        vector_db.process_all_pdfs()
+        # Use the correct PDF directory path
+        pdf_dir = "./rad-rag-qca/documents" if os.path.exists("./rad-rag-qca/documents") else "./documents"
+        vector_db.process_all_pdfs(pdf_directory=pdf_dir)
         
         # Print statistics
         stats = vector_db.get_collection_stats()
